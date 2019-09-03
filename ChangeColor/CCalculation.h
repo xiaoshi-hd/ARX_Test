@@ -15,6 +15,10 @@ public:
 	static double Min(double a, double b);
 	static double Max(double a, double b);
 
+	static AcGePoint2d MiddlePoint(AcGePoint2d pt1, AcGePoint2d pt2);
+	static AcGePoint3d MiddlePoint(AcGePoint3d pt1, AcGePoint3d pt2);
+
+
 	static double hudutodu(double angle);
 	static double dutohudu(double angle);
 

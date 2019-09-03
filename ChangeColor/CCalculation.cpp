@@ -44,6 +44,22 @@ double CCalculation::Max(double a, double b)
 		return b;
 }
 
+AcGePoint2d CCalculation::MiddlePoint(AcGePoint2d pt1, AcGePoint2d pt2)
+{
+	AcGePoint2d pt;
+	pt[X] = (pt1[X] + pt2[X]) / 2;
+	pt[Y] = (pt1[Y] + pt2[Y]) / 2;
+	return pt;
+}
+AcGePoint3d CCalculation::MiddlePoint(AcGePoint3d pt1, AcGePoint3d pt2)
+{
+	AcGePoint3d pt;
+	pt[X] = (pt1[X] + pt2[X]) / 2;
+	pt[Y] = (pt1[Y] + pt2[Y]) / 2;
+	pt[Z] = (pt1[Z] + pt2[Z]) / 2;
+	return pt;
+}
+
 //»¡¶È»¯½Ç¶È
 double CCalculation::hudutodu(double angle)
 {

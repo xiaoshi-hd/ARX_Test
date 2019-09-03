@@ -3,6 +3,9 @@
 #include "CCalculation.h"
 #include "CModifyEnt.h"
 #include "CAuxiliary.h"
+#include <math.h>
+#include "dbspline.h"//创建样条曲线
+#include "dbhatch.h"//创建填充
 
 CCreateEnt::CCreateEnt()
 {
@@ -105,6 +108,54 @@ AcDbObjectId CCreateEnt::CreatePolyArc(AcGePoint2d ptCenter, double radius,
 	polyId = CCreateEnt::PostToModelSpace(pPoly);
 	return polyId;
 }
+
+//创建椭圆
+AcDbObjectId CCreateEnt::CreateEllipse(AcGePoint3d ptCenter,
+	AcGeVector3d vecNormal, AcGeVector3d majorAxis, double
+	ratio)
+{
+	AcDbEllipse *pEllipse = new AcDbEllipse(ptCenter, vecNormal,
+		majorAxis, ratio);
+	return CCreateEnt::PostToModelSpace(pEllipse);
+}
+
+//根据外接矩形创建椭圆（函数的重载）
+AcDbObjectId CCreateEnt::CreateEllipse(AcGePoint2d pt1, AcGePoint2d pt2)
+{
+	// 计算椭圆的中心点
+	AcGePoint3d ptCenter;
+	ptCenter = CCalculation::MiddlePoint(CCalculation::Pt2dTo3d(pt1),
+		CCalculation::Pt2dTo3d(pt2));
+	AcGeVector3d vecNormal(0, 0, 1);
+	AcGeVector3d majorAxis(fabs(pt1.x - pt2.x) / 2, 0, 0);
+	double ratio = fabs((pt1.y - pt2.y) / (pt1.x - pt2.x));
+	return CCreateEnt::CreateEllipse(ptCenter, vecNormal, majorAxis,
+		ratio);
+}
+
+//创建样条曲线
+AcDbObjectId CCreateEnt::CreateSpline(const AcGePoint3dArray& points,
+	int order, double fitTolerance)
+{
+	assert(order >= 2 && order <= 26);//assert 函数用于判断一个变量或表达式的值
+	//是否为true，如果为false 则弹出一个错误对话框，并且终止程序的运行
+	AcDbSpline *pSpline = new AcDbSpline(points, order, fitTolerance);
+	AcDbObjectId splineId;
+	splineId = CCreateEnt::PostToModelSpace(pSpline);
+	return splineId;
+}
+
+//根据起终点切线的方法创建样条曲线
+AcDbObjectId CCreateEnt::CreateSpline(const AcGePoint3dArray& points,
+	const AcGeVector3d& startTangent, const AcGeVector3d& endTangent,
+	int order, double fitTolerance)
+{
+	assert(order >= 2 && order <= 26);
+	AcDbSpline *pSpline = new AcDbSpline(points, startTangent,
+		endTangent, order, fitTolerance);
+	return CCreateEnt::PostToModelSpace(pSpline);
+}
+
 //根据二维点列表创建多线
 AcDbObjectId CCreateEnt::CreatePolyline(AcGePoint2dArray points, double width)
 {
@@ -349,6 +400,47 @@ AcDbObjectId CCreateEnt::CreateMText(const AcGePoint3d& ptInsert,
 	pMText->setAttachment(AcDbMText::kBottomLeft);//修改文字对齐方式
 
 	return CCreateEnt::PostToModelSpace(pMText);
+}
+
+//创建填充
+AcDbObjectId CCreateEnt::CreateHatch(AcDbObjectIdArray objIds,
+	const ACHAR* patName, bool bAssociative)
+{
+	Acad::ErrorStatus es;
+	AcDbHatch *pHatch = new AcDbHatch();
+	// 设置填充平面
+	AcGeVector3d normal(0, 0, 1);
+	pHatch->setNormal(normal);
+	pHatch->setElevation(0);
+	// 设置关联性
+	pHatch->setAssociative(bAssociative);
+	// 设置填充图案
+	pHatch->setPattern(AcDbHatch::kPreDefined, patName);
+	// 添加填充边界
+	es = pHatch->appendLoop(AcDbHatch::kExternal, objIds);
+	// 显示填充对象
+	es = pHatch->evaluateHatch();
+	// 添加到模型空间
+	AcDbObjectId hatchId;
+	hatchId = CCreateEnt::PostToModelSpace(pHatch);
+	// 如果是关联性的填充，将填充对象与边界绑定，以便使其能获得边界
+	//对象修改的通知
+		if (bAssociative)
+		{
+			AcDbEntity *pEnt;
+			for (int i = 0; i < objIds.length(); i++)
+			{
+				es = acdbOpenAcDbEntity(pEnt, objIds[i],
+					AcDb::kForWrite);
+				if (es == Acad::eOk)
+				{
+					// 添加一个永久反应器
+					pEnt->addPersistentReactor(hatchId);
+					pEnt->close();
+				}
+			}
+		}
+	return hatchId;
 }
 
 CString CCreateEnt::NewLayer()//新建一个图层

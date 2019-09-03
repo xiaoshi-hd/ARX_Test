@@ -114,10 +114,71 @@ public:
 		CCreateEnt::CreatePolyArc(ptCenter, 500, 0, CCalculation::dutohudu(145));
 	}
 
+	static void asdkMyGroupAddEllipse()
+	{
+		// 使用中心点、所在平面、长轴矢量和短长轴比例来创建椭圆
+		AcGeVector3d vecNormal(0, 0, 1);
+		AcGeVector3d majorAxis(40, 0, 0);
+		AcDbObjectId entId;
+		entId = CCreateEnt::CreateEllipse(AcGePoint3d::kOrigin, vecNormal,
+			majorAxis, 0.5);
+		// 使用外接矩形来创建椭圆
+		AcGePoint2d pt1(60, 80), pt2(140, 120);
+		CCreateEnt::CreateEllipse(pt1, pt2);
+	}
+
+	static void asdkMyGroupAddSpline()
+	{
+		// 使用样本点直接创建样条曲线
+		AcGePoint3d pt1(0, 0, 0), pt2(10, 30, 0), pt3(60, 80, 0), pt4(100, 100, 0);
+		AcGePoint3dArray points;
+		points.append(pt1);
+		points.append(pt2);
+		points.append(pt3);
+		points.append(pt4);
+		CCreateEnt::CreateSpline(points);
+
+		// 指定起始点和终止点的切线方向，创建样条曲线
+		pt2.set(30, 10, 0);
+		pt3.set(80, 60, 0);
+		points.removeSubArray(0, 3);
+		points.append(pt1);
+		points.append(pt2);
+		points.append(pt3);
+		points.append(pt4);
+		AcGeVector3d startTangent(5, 1, 0);
+		AcGeVector3d endTangent(5, 1, 0);
+		CCreateEnt::CreateSpline(points, startTangent, endTangent);
+	}
+
 	static void asdkMyGroupAddPolyline() {
 		// Put your command code here
 		//用户交互创建多线
 		CCreateEnt::CreatePoly();
+	}
+
+	static void asdkMyGroupAddHatch()
+	{
+		// 提示用户选择填充边界
+		ads_name ss;
+		int rt = acedSSGet(NULL, NULL, NULL, NULL, ss);
+		AcDbObjectIdArray objIds;
+		// 初始化填充边界的ID数组
+		if (rt == RTNORM)
+		{
+			int length;
+			acedSSLength(ss, &length);
+			for (int i = 0; i < length; i++)
+			{
+				ads_name ent;
+				acedSSName(ss, i, ent);
+				AcDbObjectId objId;
+				acdbGetObjectId(objId, ent);
+				objIds.append(objId);
+			}
+		}
+		acedSSFree(ss); // 释放选择集
+		CCreateEnt::CreateHatch(objIds, _T("SOLID"), true);
 	}
 
 	static void asdkMyGroupAddRect()
@@ -455,21 +516,24 @@ public:
 //-----------------------------------------------------------------------------
 IMPLEMENT_ARX_ENTRYPOINT(CChangeColorApp)
 
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddLine, AddLine, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddCircle, AddCircle, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddArc, AddArc, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddPolyline, AddPolyline, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddRect, AddRect, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddPolygon, AddPolygon, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, EntInfo, EntInfo, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddText, AddText, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, NewLayer, NewLayer, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, SetLayer, SetLayer, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, DelLayer, DelLayer, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, OpenFile1, OpenFile1, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, DrawTriange, DrawTriange, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, CaculateV, CaculateV, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, SaveFile, SaveFile, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddLine, AddLine, ACRX_CMD_MODAL, NULL)//绘制直线
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddCircle, AddCircle, ACRX_CMD_MODAL, NULL)//绘制圆
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddArc, AddArc, ACRX_CMD_MODAL, NULL)//绘制圆弧
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddEllipse, AddEllipse, ACRX_CMD_MODAL, NULL)//绘制椭圆
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddSpline, AddSpline, ACRX_CMD_MODAL, NULL)//绘制样条曲线
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddPolyline, AddPolyline, ACRX_CMD_MODAL, NULL)//与用户交互创建多线
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddRect, AddRect, ACRX_CMD_MODAL, NULL)//绘制矩形
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddPolygon, AddPolygon, ACRX_CMD_MODAL, NULL)//绘制正多边形
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, EntInfo, EntInfo, ACRX_CMD_MODAL, NULL)//查看实体信息
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddText, AddText, ACRX_CMD_MODAL, NULL)//创建文字
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddHatch, AddHatch, ACRX_CMD_MODAL, NULL)//创建填充
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, NewLayer, NewLayer, ACRX_CMD_MODAL, NULL)//新建图层
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, SetLayer, SetLayer, ACRX_CMD_MODAL, NULL)//设置图层
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, DelLayer, DelLayer, ACRX_CMD_MODAL, NULL)//删除图层
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, OpenFile1, OpenFile1, ACRX_CMD_MODAL, NULL)//打开散点文件
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, DrawTriange, DrawTriange, ACRX_CMD_MODAL, NULL)//绘制三角网
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, CaculateV, CaculateV, ACRX_CMD_MODAL, NULL)//计算体积
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, SaveFile, SaveFile, ACRX_CMD_MODAL, NULL)//保存计算报告
 
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, MyPickFirst, MyPickFirstLocal, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, MySessionCmd, MySessionCmdLocal, ACRX_CMD_MODAL | ACRX_CMD_SESSION, NULL)

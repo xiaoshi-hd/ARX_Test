@@ -15,6 +15,16 @@ public:
 	static AcDbObjectId CreatePolyArc(AcGePoint2d ptCenter, double radius,
 		double angleStart, double angleEnd, double width = 0);//以多线的方式创建圆弧
 
+	static AcDbObjectId CreateEllipse(AcGePoint3d ptCenter,//创建椭圆
+		AcGeVector3d vecNormal, AcGeVector3d majorAxis, double ratio);
+	static AcDbObjectId CreateEllipse(AcGePoint2d pt1, AcGePoint2d pt2);//根据外接矩形创建椭圆（函数的重载）
+
+	static AcDbObjectId CreateSpline(const AcGePoint3dArray& points,
+		int order = 4, double fitTolerance = 0.0);//创建样条曲线
+	static AcDbObjectId CreateSpline(const AcGePoint3dArray& points,//起终点切线的方法创建样条曲线
+		const AcGeVector3d& startTangent, const AcGeVector3d&
+		endTangent, int order = 4, double fitTolerance = 0.0);
+
 	static AcDbObjectId CreatePolyline(AcGePoint2dArray points, double width = 0);//通过二维点列表创建多线
 
 	static void CreatePoly();//通过用户交互绘制多线
@@ -31,6 +41,9 @@ public:
 	static AcDbObjectId CreateMText(const AcGePoint3d& ptInsert,//创建多行文字
 		const ACHAR* text, AcDbObjectId style = AcDbObjectId::kNull,
 		double height = 2.5, double width = 10);
+
+	static AcDbObjectId CreateHatch(AcDbObjectIdArray objIds,//创建填充
+		const ACHAR* patName, bool bAssociative);
 
 	static CString NewLayer();//新建一个图层
 	static CString SetLayer();//更改图层特性
