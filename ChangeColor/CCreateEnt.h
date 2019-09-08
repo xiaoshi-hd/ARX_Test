@@ -44,6 +44,7 @@ public:
 
 	static AcDbObjectId CreateHatch(AcDbObjectIdArray objIds,//创建填充
 		const ACHAR* patName, bool bAssociative);
+	static AcDbObjectIdArray CreateRegion(const AcDbObjectIdArray& curveIds);//创建面域
 
 	static CString NewLayer();//新建一个图层
 	static CString SetLayer();//更改图层特性

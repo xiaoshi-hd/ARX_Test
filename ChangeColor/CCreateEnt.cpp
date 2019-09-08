@@ -417,7 +417,7 @@ AcDbObjectId CCreateEnt::CreateHatch(AcDbObjectIdArray objIds,
 	// 设置填充图案
 	pHatch->setPattern(AcDbHatch::kPreDefined, patName);
 	// 添加填充边界
-	es = pHatch->appendLoop(AcDbHatch::kExternal, objIds);
+	es = pHatch->appendLoop(AcDbHatch::kExternal, objIds);//为什么填充两个对象就会失败
 	// 显示填充对象
 	es = pHatch->evaluateHatch();
 	// 添加到模型空间
@@ -441,6 +441,56 @@ AcDbObjectId CCreateEnt::CreateHatch(AcDbObjectIdArray objIds,
 			}
 		}
 	return hatchId;
+}
+
+//创建面域
+AcDbObjectIdArray CCreateEnt::CreateRegion(const AcDbObjectIdArray& curveIds)
+{
+	AcDbObjectIdArray regionIds; // 生成的面域的ID数组
+
+	AcDbVoidPtrArray curves; // 指向作为面域边界的曲线的指针的数组
+	AcDbVoidPtrArray regions; // 指向创建的面域对象的指针的数组
+
+	AcDbEntity *pEnt; // 临时指针，用来关闭边界曲线
+	AcDbRegion *pRegion; // 临时对象，用来将面域添加到模型空间
+	// 用curveIds初始化curves
+	for (int i = 0; i < curveIds.length(); i++)
+	{
+		acdbOpenAcDbEntity(pEnt, curveIds.at(i), AcDb::kForRead);//通过实体ID得到指针
+		if (pEnt->isKindOf(AcDbCurve::desc()))//AcDbCurve是圆，圆弧，多线段这些类的基类，这里判断实体是否是该类型
+		{
+			curves.append(static_cast<void*>(pEnt));//类型转换
+		}
+	}
+	Acad::ErrorStatus es = AcDbRegion::createFromCurves(curves, regions);//创建面域
+	if (es == Acad::eOk)
+	{
+		// 将生成的面域添加到模型空间
+		for (int i = 0; i < regions.length(); i++)
+		{
+			// 将空指针（可指向任何类型）转化为指向面域的指针
+			pRegion = static_cast<AcDbRegion*>(regions[i]);
+			pRegion->setDatabaseDefaults();
+			//上述函数将实体的颜色层线型线型标度可见性图样式名称线宽设置为实体当前所在的数据库的默认值
+			AcDbObjectId regionId;
+			regionId = CCreateEnt::PostToModelSpace(pRegion);
+			regionIds.append(regionId);
+		}
+	}
+	else // 如果创建不成功，也要删除已经生成的面域
+	{
+		for (int i = 0; i < regions.length(); i++)
+		{
+			delete (AcRxObject*)regions[i];
+		}
+	}
+	// 关闭作为边界的对象
+	for (int i = 0; i < curves.length(); i++)
+	{
+		pEnt = static_cast<AcDbEntity*>(curves[i]);
+		pEnt->close();
+	}
+	return regionIds;
 }
 
 CString CCreateEnt::NewLayer()//新建一个图层

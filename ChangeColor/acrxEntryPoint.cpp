@@ -157,30 +157,6 @@ public:
 		CCreateEnt::CreatePoly();
 	}
 
-	static void asdkMyGroupAddHatch()
-	{
-		// 提示用户选择填充边界
-		ads_name ss;
-		int rt = acedSSGet(NULL, NULL, NULL, NULL, ss);
-		AcDbObjectIdArray objIds;
-		// 初始化填充边界的ID数组
-		if (rt == RTNORM)
-		{
-			int length;
-			acedSSLength(ss, &length);
-			for (int i = 0; i < length; i++)
-			{
-				ads_name ent;
-				acedSSName(ss, i, ent);
-				AcDbObjectId objId;
-				acdbGetObjectId(objId, ent);
-				objIds.append(objId);
-			}
-		}
-		acedSSFree(ss); // 释放选择集
-		CCreateEnt::CreateHatch(objIds, _T("SOLID"), true);
-	}
-
 	static void asdkMyGroupAddRect()
 	{
 		ads_point ptStart; // 起点
@@ -208,6 +184,162 @@ public:
 		CCreateEnt::CreatePolygon(AcGePoint2d::kOrigin, 6, 100, 0, 1);
 		//输入参数为中心、边数、外接圆半径、旋转角度（弧度值）和线宽
 	}
+
+	static void asdkMyGroupAddText()
+	{
+		// 创建单行文字
+		AcGePoint3d ptInsert(0, 12, 0);
+		CCreateEnt::CreateText(ptInsert, _T("CAD文字"));
+		// 创建多行文字
+		ptInsert.set(0, 0, 0);
+		CCreateEnt::CreateMText(ptInsert, _T("http://www.cadhelp.net\n哈哈"));
+	}
+
+
+	static void asdkMyGroupAddHatch()
+	{
+		// 提示用户选择填充边界
+		ads_name ss;//要操作的选择集的图元名
+		int rt = acedSSGet(NULL, NULL, NULL, NULL, ss);
+		AcDbObjectIdArray objIds;//对象ID列表
+		// 初始化填充边界的ID数组
+		if (rt == RTNORM)
+		{
+			acedAlert(_T("已成功选择实体！"));
+			Adesk::Int32 length;
+			acedSSLength(ss, &length);//返回指定选择集中的实体数
+			for (int i = 0; i < length; i++)
+			{
+				ads_name ent;
+				acedSSName(ss, i, ent);//返回选择集中指定位置的实体名
+				AcDbObjectId objId;
+				acdbGetObjectId(objId, ent);//将ads_name转换为实体id
+				objIds.append(objId);//添加实体id到列表
+			}
+		}
+		acedSSFree(ss); // 释放选择集
+
+		CCreateEnt::CreateHatch(objIds, _T("SOLID"), true);//添加填充
+
+		/*AcGePoint3d ptBase(0, 0, 0);//平移选择集的成员
+		AcGePoint3d ptDest(100, 200, 0);
+		for (int i = 0; i < objIds.length(); i++)
+		{
+			CModifyEnt::Move(objIds[i],ptBase,ptDest);
+		}*/
+	}
+
+	static void asdkMyGroupAddRegion()
+	{
+		// 使用选择集，提示用户选择作为面域边界的对象
+		ads_name ss;
+		int rt = acedSSGet(NULL, NULL, NULL, NULL, ss); // 提示用户选择对象
+		AcDbObjectIdArray objIds;
+		// 根据选择集中的对象构建边界曲线的ID数组
+		if (rt == RTNORM)
+		{
+			Adesk::Int32 length;
+			acedSSLength(ss, &length); // 获得选择集中的对象个数
+			for (int i = 0; i < length; i++)
+			{
+				ads_name ent;
+				acedSSName(ss, i, ent);
+				AcDbObjectId objId;
+				acdbGetObjectId(objId, ent);
+				objIds.append(objId);
+			}
+		}
+		acedSSFree(ss); // 及时释放选择集
+
+		AcDbObjectIdArray regionIds;
+		regionIds = CCreateEnt::CreateRegion(objIds);//把对象ID数组传给函数，返回面域ID数组
+
+		int number = regionIds.length();
+		if (number > 0)
+		{
+			acutPrintf(_T("\n已经创建%d个面域！"), number);
+		}
+		else
+		{
+			acutPrintf(_T("\n未能创建面域！"));
+		}
+	}
+
+
+	static void asdkMyGroupAddBox()
+	{
+		AcDb3dSolid *pSolid = new AcDb3dSolid();
+		Acad::ErrorStatus es = pSolid->createBox(40, 50, 30);
+		if (es != Acad::eOk)
+		{
+			acedAlert(_T("创建长方体失败!"));
+			delete pSolid;
+			return;
+		}
+		// 使用几何变换矩阵移动长方体
+		AcGeMatrix3d xform;
+		AcGeVector3d vec(100, 100, 100);
+		xform.setToTranslation(vec);
+		pSolid->transformBy(xform);
+		// 将长方体添加到模型空间
+		CCreateEnt::PostToModelSpace(pSolid);
+	}
+
+	static void asdkMyGroupAddCylinder()
+	{
+		// 创建特定参数的圆柱体（实际上是一个圆锥体）
+		AcDb3dSolid *pSolid = new AcDb3dSolid();
+		pSolid->createFrustum(30, 10, 10, 0);
+		// 将圆锥体添加到模型空间
+		CCreateEnt::PostToModelSpace(pSolid);
+
+		AcDb3dSolid *pSolid1 = new AcDb3dSolid();
+		pSolid1->createFrustum(30, 10, 5, 5);
+		// 使用几何变换矩阵移动圆柱
+		AcGeMatrix3d xform;
+		AcGeVector3d vec(0, 100, 100);
+		xform.setToTranslation(vec);
+		pSolid1->transformBy(xform);
+		// 将圆锥体添加到模型空间
+		CCreateEnt::PostToModelSpace(pSolid1);
+	}
+
+	static void asdkMyGroupRevolveEnt()
+	{
+		// 设置顶点的坐标
+		AcGePoint3d vertex[5];
+		vertex[0] = AcGePoint3d(15, 0, 0);
+		vertex[1] = AcGePoint3d(45, 0, 0);
+		vertex[2] = AcGePoint3d(35, 9, 0);
+		vertex[3] = AcGePoint3d(41, 18, 0);
+		vertex[4] = AcGePoint3d(15, 18, 0);
+		AcGePoint3dArray points;
+		for (int i = 0; i <= 4; i++)
+		{
+			points.append(vertex[i]);
+		}
+		// 创建作为旋转截面的多段线
+		AcDb3dPolyline *p3dPoly = new
+			AcDb3dPolyline(AcDb::k3dSimplePoly, points, true);
+
+		AcDbObjectId polyId = CCreateEnt::PostToModelSpace(p3dPoly);
+
+		// 将闭合的多段线转化成面域
+		AcDbObjectIdArray boundaryIds, regionIds;
+		boundaryIds.append(polyId);
+		regionIds = CCreateEnt::CreateRegion(boundaryIds);
+
+		// 对面域进行旋转操作创建3维实体
+		AcDbRegion *pRegion;
+		Acad::ErrorStatus es = acdbOpenObject(pRegion, regionIds.at(0), AcDb::kForRead);
+		AcDb3dSolid *pSolid = new AcDb3dSolid();
+		es = pSolid->revolve(pRegion, AcGePoint3d::kOrigin, AcGeVector3d(0, 1, 0), 8 * atan(1));
+		CCreateEnt::PostToModelSpace(pSolid);
+
+		pRegion->close();
+
+	}
+	
 
 	static void asdkMyGroupEntInfo()
 	{
@@ -263,15 +395,6 @@ public:
 		数释放结果缓冲区链表的存储空间（rbEnt 并未指向链表的头节点），造成内存泄漏。*/
 	}
 
-	static void asdkMyGroupAddText()
-	{
-		// 创建单行文字
-		AcGePoint3d ptInsert(0, 12, 0);
-		CCreateEnt::CreateText(ptInsert, _T("CAD文字"));
-		// 创建多行文字
-		ptInsert.set(0, 0, 0);
-		CCreateEnt::CreateMText(ptInsert, _T("http://www.cadhelp.net\n哈哈"));
-	}
 
 	static void asdkMyGroupNewLayer()
 	{
@@ -296,6 +419,7 @@ public:
 			acutPrintf(_T("您刚才删除了图层：") + layerName);
 		}
 	}
+
 
 	static void asdkMyGroupOpenFile1()
 	{
@@ -524,12 +648,22 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddSpline, AddSpline, A
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddPolyline, AddPolyline, ACRX_CMD_MODAL, NULL)//与用户交互创建多线
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddRect, AddRect, ACRX_CMD_MODAL, NULL)//绘制矩形
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddPolygon, AddPolygon, ACRX_CMD_MODAL, NULL)//绘制正多边形
-ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, EntInfo, EntInfo, ACRX_CMD_MODAL, NULL)//查看实体信息
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddText, AddText, ACRX_CMD_MODAL, NULL)//创建文字
+
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddHatch, AddHatch, ACRX_CMD_MODAL, NULL)//创建填充
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddRegion, AddRegion, ACRX_CMD_MODAL, NULL)//创建面域
+
+
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddBox, AddBox, ACRX_CMD_MODAL, NULL)//创建三维长方体
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddCylinder, AddCylinder, ACRX_CMD_MODAL, NULL)//创建三维圆柱圆锥
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, RevolveEnt, RevolveEnt, ACRX_CMD_MODAL, NULL)//通过面域旋转的方式创建三维实体
+
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, EntInfo, EntInfo, ACRX_CMD_MODAL, NULL)//查看实体信息
+
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, NewLayer, NewLayer, ACRX_CMD_MODAL, NULL)//新建图层
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, SetLayer, SetLayer, ACRX_CMD_MODAL, NULL)//设置图层
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, DelLayer, DelLayer, ACRX_CMD_MODAL, NULL)//删除图层
+
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, OpenFile1, OpenFile1, ACRX_CMD_MODAL, NULL)//打开散点文件
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, DrawTriange, DrawTriange, ACRX_CMD_MODAL, NULL)//绘制三角网
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, CaculateV, CaculateV, ACRX_CMD_MODAL, NULL)//计算体积
