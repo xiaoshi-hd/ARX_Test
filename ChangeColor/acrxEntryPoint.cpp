@@ -199,25 +199,9 @@ public:
 	static void asdkMyGroupAddHatch()
 	{
 		// 提示用户选择填充边界
-		ads_name ss;//要操作的选择集的图元名
-		int rt = acedSSGet(NULL, NULL, NULL, NULL, ss);
 		AcDbObjectIdArray objIds;//对象ID列表
-		// 初始化填充边界的ID数组
-		if (rt == RTNORM)
-		{
-			acedAlert(_T("已成功选择实体！"));
-			Adesk::Int32 length;
-			acedSSLength(ss, &length);//返回指定选择集中的实体数
-			for (int i = 0; i < length; i++)
-			{
-				ads_name ent;
-				acedSSName(ss, i, ent);//返回选择集中指定位置的实体名
-				AcDbObjectId objId;
-				acdbGetObjectId(objId, ent);//将ads_name转换为实体id
-				objIds.append(objId);//添加实体id到列表
-			}
-		}
-		acedSSFree(ss); // 释放选择集
+
+		objIds = CCreateEnt::SSet();
 
 		CCreateEnt::CreateHatch(objIds, _T("SOLID"), true);//添加填充
 
@@ -232,24 +216,9 @@ public:
 	static void asdkMyGroupAddRegion()
 	{
 		// 使用选择集，提示用户选择作为面域边界的对象
-		ads_name ss;
-		int rt = acedSSGet(NULL, NULL, NULL, NULL, ss); // 提示用户选择对象
-		AcDbObjectIdArray objIds;
-		// 根据选择集中的对象构建边界曲线的ID数组
-		if (rt == RTNORM)
-		{
-			Adesk::Int32 length;
-			acedSSLength(ss, &length); // 获得选择集中的对象个数
-			for (int i = 0; i < length; i++)
-			{
-				ads_name ent;
-				acedSSName(ss, i, ent);
-				AcDbObjectId objId;
-				acdbGetObjectId(objId, ent);
-				objIds.append(objId);
-			}
-		}
-		acedSSFree(ss); // 及时释放选择集
+		AcDbObjectIdArray objIds;//对象ID列表
+
+		objIds = CCreateEnt::SSet();
 
 		AcDbObjectIdArray regionIds;
 		regionIds = CCreateEnt::CreateRegion(objIds);//把对象ID数组传给函数，返回面域ID数组
@@ -582,6 +551,116 @@ public:
 		}
 	}
 
+	static void asdkMyGroupAddBlk()
+	{
+		CCreateEnt::CreateBlk();
+		acutPrintf(_T("创建块记录成功！"));
+	}
+
+	static void asdkMyGroupInsertBlkRef()
+	{
+		CCreateEnt::InsertBlk();
+	}
+
+	static void asdkMyGroupAddXData()
+	{
+		
+		// 提示用户选择所要添加扩展数据的图形对象
+		ads_name en;
+		ads_point pt;//选择点的坐标
+		if (acedEntSel(_T("\n选择所要添加扩展数据的实体："), en, pt) != RTNORM)
+		{
+			acutPrintf(_T("\n选择实体失败！"));
+			return;
+		}
+		acutPrintf(_T("\n成功选择实体！"));
+
+		AcDbObjectId entId;
+		Acad::ErrorStatus es = acdbGetObjectId(entId, en);
+
+		// 扩展数据的内容
+		struct resbuf* pRb;
+		//char appName[] = { "XData" };
+		//char typeName[] = { "道路中心线" };
+
+		// 注册应用程序名称
+		ACHAR* name = _T("XData");
+
+		acdbRegApp(name);
+
+		// 创建结果缓冲区链表
+		pRb = acutBuildList(AcDb::kDxfRegAppName, name, //应用程序名称
+			AcDb::kDxfXdAsciiString, _T("道路中心线"), //字符串
+			AcDb::kDxfXdInteger32, 2,// 整数
+			AcDb::kDxfXdReal, 3.14, //实数
+			AcDb::kDxfXdWorldXCoord, pt, // 点坐标值
+			RTNONE);
+
+		// 为选择的实体添加扩展数据
+		AcDbEntity *pEnt;
+		acdbOpenAcDbEntity(pEnt, entId, AcDb::kForWrite);
+		struct resbuf *pTemp;
+
+		pTemp = pEnt->xData(name);//xData 函数用于获取一个对象的扩展数据，结果缓冲区链表
+
+		if (pTemp != NULL) // 如果已经包含扩展数据，就不再添加新的扩展数据
+		{
+			acutRelRb(pTemp);
+			acutPrintf(_T("\n所选择的实体已经包含扩展数据！"));
+		}
+		else
+		{
+			pEnt->setXData(pRb);//setXData 函数用于设置一个对象的扩展数据
+			acutPrintf(_T("\n成功添加扩展数据！"));
+		}
+		pEnt->close();
+
+		acutRelRb(pRb);
+	}
+
+	static void asdkMyGroupViewXData()
+	{
+		// 提示用户选择所要查看扩展数据的图形对象
+		ads_name en;
+		ads_point pt;
+		if (acedEntSel(_T("\n选择所要查看扩展数据的实体："), en, pt) != RTNORM)
+			return;
+		AcDbObjectId entId;
+		Acad::ErrorStatus es = acdbGetObjectId(entId, en);
+
+		// 打开图形对象，查看是否包含扩展数据
+		AcDbEntity *pEnt;
+		acdbOpenAcDbEntity(pEnt, entId, AcDb::kForRead);
+		struct resbuf *pRb;
+		pRb = pEnt->xData(_T("XData"));//xData 函数能够获得一个结果缓冲区链表
+		pEnt->close();
+
+		if (pRb != NULL)
+		{
+			// 在命令行显示所有的扩展数据
+			struct resbuf *pTemp;
+			pTemp = pRb;
+			// 首先要跳过应用程序的名称这一项
+			pTemp = pTemp->rbnext;
+			acutPrintf(_T("\n字符串类型的扩展数据是：%s"),
+				pTemp->resval.rstring);
+			pTemp = pTemp->rbnext;
+			acutPrintf(_T("\n整数类型的扩展数据是：%d"), pTemp->resval.rint);
+			pTemp = pTemp->rbnext;
+			acutPrintf(_T("\n实数类型的扩展数据是：%.2f"),
+				pTemp->resval.rreal);
+			pTemp = pTemp->rbnext;
+			acutPrintf(_T("\n点坐标类型的扩展数据是：(%.2f, %.2f, %.2f)"),
+				pTemp->resval.rpoint[X], pTemp->resval.rpoint[Y],
+				pTemp->resval.rpoint[Z]);
+			acutRelRb(pRb);
+		}
+		else
+		{
+			acutPrintf(_T("\n所选择的实体不包含任何的扩展数据！"));
+		}
+	}
+
 	// Modal Command with pickfirst selection
 	// ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, MyPickFirst, MyPickFirstLocal, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET)
 	static void asdkMyGroupMyPickFirst () {
@@ -668,6 +747,12 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, OpenFile1, OpenFile1, A
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, DrawTriange, DrawTriange, ACRX_CMD_MODAL, NULL)//绘制三角网
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, CaculateV, CaculateV, ACRX_CMD_MODAL, NULL)//计算体积
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, SaveFile, SaveFile, ACRX_CMD_MODAL, NULL)//保存计算报告
+
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddBlk, AddBlk, ACRX_CMD_MODAL, NULL)//创建块
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, InsertBlkRef, InsertBlkRef, ACRX_CMD_MODAL, NULL)//插入块参照
+
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, AddXData, AddXData, ACRX_CMD_MODAL, NULL)//添加扩展数据
+ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, ViewXData, ViewXData, ACRX_CMD_MODAL, NULL)//浏览扩展数据
 
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, MyPickFirst, MyPickFirstLocal, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CChangeColorApp, asdkMyGroup, MySessionCmd, MySessionCmdLocal, ACRX_CMD_MODAL | ACRX_CMD_SESSION, NULL)

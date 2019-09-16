@@ -51,6 +51,11 @@ public:
 	static CString ChooseLayer();//选择图层（让用户选择实体添加到指定的图层）
 	static CString DelLayer();//删除图层
 
+	static AcDbObjectIdArray SSet();//创建选择集
+
+	static AcDbObjectId CreateBlk();//创建块定义
+	static void InsertBlk();//插入块参照
+
 	static AcDbObjectId CCreateEnt::PostToModelSpace(AcDbEntity* pEnt);//将实体添加到图形数据库
 };
 

@@ -406,6 +406,9 @@ AcDbObjectId CCreateEnt::CreateMText(const AcGePoint3d& ptInsert,
 AcDbObjectId CCreateEnt::CreateHatch(AcDbObjectIdArray objIds,
 	const ACHAR* patName, bool bAssociative)
 {
+	int length = objIds.length();
+	acutPrintf(_T("%d"), length);
+
 	Acad::ErrorStatus es;
 	AcDbHatch *pHatch = new AcDbHatch();
 	// 设置填充平面
@@ -667,6 +670,154 @@ CString CCreateEnt::DelLayer()//删除图层
 	return layerName;
 }
 
+AcDbObjectIdArray CCreateEnt::SSet()//创建选择集
+{
+	ads_name ss;//要操作的选择集的图元名
+	struct resbuf *rb; // 结果缓冲区链表
+	rb = acutBuildList(RTDXF0, _T("CIRCLE"), // 实体类型
+		8, _T("0"), // 图层
+		RTNONE);
+
+	int rt = acedSSGet(/*_T("X")*/NULL, NULL, NULL, rb, ss);
+	AcDbObjectIdArray objIds;//对象ID列表
+	// 初始化填充边界的ID数组
+	if (rt == RTNORM)
+	{
+		acedAlert(_T("已成功选择实体！"));
+		Adesk::Int32 length;
+		acedSSLength(ss, &length);//返回指定选择集中的实体数
+
+		for (int i = 0; i < length; i++)
+		{
+			ads_name ent;
+			acedSSName(ss, i, ent);//返回选择集中指定位置的实体名
+			AcDbObjectId objId;
+			acdbGetObjectId(objId, ent);//将ads_name转换为实体id
+			objIds.append(objId);//添加实体id到列表
+		}
+	}
+	acutRelRb(rb);
+	acedSSFree(ss); // 释放选择集
+	return objIds;//返回实体id数组
+}
+AcDbObjectId CCreateEnt::CreateBlk()//创建块定义
+{
+	//获取当前图形数据库的块表
+	AcDbBlockTable *pBlkTbl;
+	acdbHostApplicationServices()->workingDatabase()
+		->getBlockTable(pBlkTbl, AcDb::kForWrite);
+
+	//创建新的块表记录
+	AcDbBlockTableRecord *pBlkTblRcd;
+	pBlkTblRcd = new AcDbBlockTableRecord();
+
+	//根据用户的输入设置块表记录的名称
+	ACHAR blkName[40];
+	if (acedGetString(Adesk::kFalse, _T("\n请输入图块的名称："), blkName) != RTNORM)
+	{
+		pBlkTbl->close();
+		delete pBlkTblRcd;
+		return NULL;
+	}
+	pBlkTblRcd->setName(blkName);
+
+	//将块表记录添加到块表中
+	AcDbObjectId blkDefId;
+	pBlkTbl->add(blkDefId,pBlkTblRcd);
+	pBlkTbl->close();
+
+	//创建实体
+	AcGePoint3d ptStart(-10, 0, 0), ptEnd(10, 0, 0);
+	AcDbLine *pLine1 = new AcDbLine(ptStart, ptEnd); // 创建一条直线
+	ptStart.set(0, -10, 0);
+	ptEnd.set(0, 10, 0);
+	AcDbLine *pLine2 = new AcDbLine(ptStart, ptEnd); // 创建一条直线
+	AcGeVector3d vecNormal(0, 0, 1);
+	AcDbCircle *pCircle = new AcDbCircle(AcGePoint3d::kOrigin, vecNormal, 6);
+
+	// 创建一个属性 输入直径
+	AcDbAttributeDefinition *pAttDef = new AcDbAttributeDefinition(
+		ptEnd, _T("20"), _T("直径"), _T("输入直径"));
+
+	//为块表记录添加实体
+	AcDbObjectId entId;
+	pBlkTblRcd->appendAcDbEntity(entId, pLine1);
+	pBlkTblRcd->appendAcDbEntity(entId, pLine2);
+	pBlkTblRcd->appendAcDbEntity(entId, pCircle);
+	pBlkTblRcd->appendAcDbEntity(entId, pAttDef);
+
+	// 关闭实体和块表记录
+	pLine1->close();
+	pLine2->close();
+	pCircle->close();
+	pAttDef->close();
+	pBlkTblRcd->close();
+
+	//(这里还可以通过选择集的方式让用户选择实体,
+	//但是这种方式选择的是实体id，并不是实体，而且还有可能选择成块参照)
+	/*AcDbObjectIdArray objIds;//对象ID列表
+	objIds = CCreateEnt::SSet();
+
+	for (int i = 0; i < objIds.length(); i++)
+	{
+
+	}
+	*/
+
+	return blkDefId;//返回块表记录ID
+}
+
+void CCreateEnt::InsertBlk()
+{
+	// 获得用户输入的块定义名称
+	ACHAR blkName[40];
+	if (acedGetString(Adesk::kFalse, _T("\n输入图块的名称："), blkName) != RTNORM)
+	{
+		return;
+	}
+
+	// 获得当前数据库的块表
+	AcDbBlockTable *pBlkTbl;
+	acdbHostApplicationServices()->workingDatabase()
+		->getBlockTable(pBlkTbl, AcDb::kForWrite);
+
+	// 查找用户指定的块定义是否存在
+	CString strBlkDef;
+	strBlkDef.Format(_T("%s"), blkName);
+	if (!pBlkTbl->has(strBlkDef))
+	{
+		acutPrintf(_T("\n当前图形中未包含指定名称的块定义！"));
+		pBlkTbl->close();
+		return;
+	}
+	// 获得用户输入的块参照的插入点
+	ads_point pt;//ads_point 实际上是一个三维浮点数组
+	if (acedGetPoint(NULL, _T("\n输入块参照的插入点："), pt) != RTNORM)
+	{
+		pBlkTbl->close();
+		return;
+	}
+	//ptInsert.x = pt[X];
+	AcGePoint3d ptInsert = asPnt3d(pt);
+
+	// 获得用户指定的块表记录
+	AcDbObjectId blkDefId;
+	pBlkTbl->getAt(strBlkDef, blkDefId);
+
+	// 创建块参照对象
+	AcDbBlockReference *pBlkRef = new AcDbBlockReference(ptInsert, blkDefId);
+
+	// 将块参照添加到模型空间
+	AcDbBlockTableRecord *pBlkTblRcd;
+	pBlkTbl->getAt(ACDB_MODEL_SPACE, pBlkTblRcd, AcDb::kForWrite);
+	AcDbObjectId entId;
+	pBlkTblRcd->appendAcDbEntity(entId, pBlkRef);
+
+	// 关闭数据库的对象
+	pBlkRef->close();
+	pBlkTblRcd->close();
+	pBlkTbl->close();
+}
 // 将实体添加到图形数据库的模型空间
 AcDbObjectId CCreateEnt::PostToModelSpace(AcDbEntity* pEnt)
 {
